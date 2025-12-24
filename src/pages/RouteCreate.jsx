@@ -8,8 +8,6 @@ const RouteCreate = () => {
     name: '',
     description: '',
     duration_hours: 4,
-    generator_type: 'hybrid',
-    use_llm: true,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -77,33 +75,6 @@ const RouteCreate = () => {
             required
           />
         </div>
-
-        <div className="form-group">
-          <label>Тип генератора</label>
-          <select
-            name="generator_type"
-            value={formData.generator_type}
-            onChange={handleChange}
-          >
-            <option value="hybrid">Гибридный (LLM + алгоритм)</option>
-            <option value="llm">Только LLM</option>
-            <option value="algorithmic">Только алгоритм</option>
-          </select>
-        </div>
-
-        {formData.generator_type === 'hybrid' && (
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                name="use_llm"
-                checked={formData.use_llm}
-                onChange={handleChange}
-              />
-              Использовать LLM (если доступно)
-            </label>
-          </div>
-        )}
 
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? 'Создание...' : 'Создать маршрут'}
