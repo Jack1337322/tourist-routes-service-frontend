@@ -94,9 +94,15 @@ export const analyticsAPI = {
   popularRoutes: (limit) => api.get('/analytics/popular/', { params: { limit } }),
   routeStats: () => api.get('/analytics/stats/'),
   attractionStats: () => api.get('/analytics/attractions/stats/'),
-  popularityChart: (limit) => api.get('/analytics/charts/popularity/', { params: { limit } }),
-  categoryChart: () => api.get('/analytics/charts/categories/'),
-  ratingChart: () => api.get('/analytics/charts/ratings/'),
+  popularAttractions: (limit, categoryId) => {
+    const params = { limit }
+    if (categoryId) params.category_id = categoryId
+    return api.get('/analytics/popular-attractions/', { params })
+  },
+  categoryPopularity: () => api.get('/analytics/categories/popularity/'),
+  popularAttractionsByCategory: (limit) => api.get('/analytics/attractions/by-category/', { params: { limit } }),
+  attractionUsageTrends: (days) => api.get('/analytics/trends/attractions/', { params: { days } }),
+  categoryDistributionInRoutes: () => api.get('/analytics/categories/in-routes/'),
   userAnalytics: () => api.get('/analytics/user/'),
 }
 
