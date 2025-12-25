@@ -1,27 +1,117 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import { routesAPI } from '../services/api'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
 import './RouteDetail.css'
-
-// Fix for default marker icons
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
 
 const RouteDetail = () => {
   const { id } = useParams()
   const [route, setRoute] = useState(null)
   const [loading, setLoading] = useState(true)
+  const mapRef = useRef(null)
+  const mapInstanceRef = useRef(null)
+  const placemarksRef = useRef([])
 
   useEffect(() => {
     loadRoute()
   }, [id])
+
+  // Инициализация карты через нативный API Яндекс карт
+  useEffect(() => {
+    if (!route || !mapRef.current || typeof window === 'undefined' || !window.ymaps) {
+      return
+    }
+
+    const attractions = route.route_attractions || []
+    const positions = attractions
+      .map((ra) => [
+        parseFloat(ra.attraction.latitude),
+        parseFloat(ra.attraction.longitude),
+      ])
+      .filter((pos) => pos[0] && pos[1])
+
+    if (positions.length === 0) {
+      return
+    }
+
+    const center = positions.length > 0
+      ? [positions[0][0], positions[0][1]]
+      : [55.8304, 49.0661] // Kazan center
+
+    // Инициализируем карту
+    window.ymaps.ready(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy()
+      }
+
+      const map = new window.ymaps.Map(mapRef.current, {
+        center: center,
+        zoom: 13,
+      })
+
+      mapInstanceRef.current = map
+      placemarksRef.current = []
+
+      // Создаем маркеры
+      attractions.forEach((ra) => {
+        const lat = parseFloat(ra.attraction.latitude)
+        const lon = parseFloat(ra.attraction.longitude)
+        
+        if (!lat || !lon) return
+
+        const description = ra.attraction.short_description || ra.attraction.description?.substring(0, 100) || 'Описание отсутствует'
+        const balloonContent = `
+          <div style="padding: 10px;">
+            <strong style="font-size: 16px; display: block; margin-bottom: 8px;">
+              ${ra.order}. ${ra.attraction.name}
+            </strong>
+            <p style="margin: 0; color: #666;">
+              ${description}
+            </p>
+            ${ra.visit_duration ? `<p style="margin: 8px 0 0 0; color: #888; font-size: 14px;">⏱ Время посещения: ${ra.visit_duration} мин</p>` : ''}
+            ${ra.attraction.rating > 0 ? `<p style="margin: 4px 0 0 0; color: #888; font-size: 14px;">⭐ Рейтинг: ${ra.attraction.rating}</p>` : ''}
+          </div>
+        `
+
+        const placemark = new window.ymaps.Placemark(
+          [lat, lon],
+          {
+            balloonContent: balloonContent,
+            hintContent: `${ra.order}. ${ra.attraction.name}`,
+          },
+          {
+            preset: 'islands#blueCircleDotIcon',
+            openBalloonOnClick: true,
+            openHintOnHover: true,
+          }
+        )
+
+        map.geoObjects.add(placemark)
+        placemarksRef.current.push(placemark)
+      })
+
+      // Добавляем линию маршрута
+      if (positions.length > 1) {
+        const polyline = new window.ymaps.Polyline(
+          positions,
+          {},
+          {
+            strokeColor: '#0000FF',
+            strokeWidth: 4,
+            strokeOpacity: 0.7,
+          }
+        )
+        map.geoObjects.add(polyline)
+      }
+    })
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy()
+        mapInstanceRef.current = null
+      }
+      placemarksRef.current = []
+    }
+  }, [route])
 
   const loadRoute = async () => {
     try {
@@ -50,10 +140,6 @@ const RouteDetail = () => {
     ])
     .filter((pos) => pos[0] && pos[1])
 
-  const center =
-    positions.length > 0
-      ? [positions[0][0], positions[0][1]]
-      : [55.8304, 49.0661] // Kazan center
 
   return (
     <div className="route-detail">
@@ -94,34 +180,7 @@ const RouteDetail = () => {
 
         {positions.length > 0 && (
           <div className="route-map">
-            <MapContainer
-              center={center}
-              zoom={13}
-              style={{ height: '400px', width: '100%' }}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              {attractions.map((ra, index) => (
-                <Marker
-                  key={ra.id}
-                  position={[
-                    parseFloat(ra.attraction.latitude),
-                    parseFloat(ra.attraction.longitude),
-                  ]}
-                >
-                  <Popup>
-                    <strong>{ra.order}. {ra.attraction.name}</strong>
-                    <br />
-                    {ra.attraction.short_description || ra.attraction.description?.substring(0, 100)}
-                  </Popup>
-                </Marker>
-              ))}
-              {positions.length > 1 && (
-                <Polyline positions={positions} color="blue" />
-              )}
-            </MapContainer>
+            <div ref={mapRef} style={{ width: '100%', height: '400px' }}></div>
           </div>
         )}
 
